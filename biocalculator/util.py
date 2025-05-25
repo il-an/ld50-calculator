@@ -1,6 +1,6 @@
 import math
 
-def karber(max_dose: int, max_animals: int, died: [int], dose_coefficient: int = 10, number_of_doses: int = 8) -> float:
+def karber(max_dose: int, max_animals: int, died: list[int], dose_coefficient: int = 10, number_of_doses: int = 8) -> float:
     """
     counts ld50 using karber's method
     :param max_dose: maximum dose used
