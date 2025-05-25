@@ -21,6 +21,9 @@ from biocalculator.util import karber
 
 
 class LD50Calculator(QMainWindow):
+    """
+    main window for the LD50 calculator application
+    """
     def __init__(self):
         super().__init__()
         self.setWindowTitle("LD50 Калькулятор")
@@ -146,7 +149,7 @@ class LD50Calculator(QMainWindow):
             # Собираем данные
             max_dose = int(self.max_dose_edit.text())
             max_animals = int(self.max_animals_edit.text())
-            dose_coef = float(self.dose_coef_edit.text())
+            dose_coef = int(self.dose_coef_edit.text())
             num_doses = int(self.num_doses_edit.text())
 
             died = []
