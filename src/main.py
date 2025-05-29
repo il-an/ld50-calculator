@@ -17,7 +17,72 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+# Импорты для построения графиков
+import matplotlib.pyplot as plt
+from matplotlib.figure import Figure
+from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
+import numpy as np
+
 from biocalculator.util import karber
+
+
+class SurvivalPlot(QWidget):
+    """Виджет для отображения графика выживаемости"""
+    def __init__(self, doses, died, max_animals, ld50=None, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("График выживаемости")
+        self.setMinimumSize(800, 600)
+
+        # Создаем компоновку
+        layout = QVBoxLayout(self)
+
+        # Создаем фигуру matplotlib для графика
+        self.figure = Figure(figsize=(8, 6))
+        self.canvas = FigureCanvas(self.figure)
+
+        # Добавляем панель инструментов
+        self.toolbar = NavigationToolbar(self.canvas, self)
+
+        layout.addWidget(self.toolbar)
+        layout.addWidget(self.canvas)
+
+        # Строим график
+        self.plot_survival(doses, died, max_animals, ld50)
+
+    def plot_survival(self, doses, died, max_animals, ld50=None):
+        # Очищаем фигуру
+        self.figure.clear()
+
+        # Создаем график
+        ax = self.figure.add_subplot(111)
+
+        # Вычисляем процент выживших
+        survival_percent = [(1 - d / max_animals) * 100 for d in died]
+
+        # Строим график выживаемости
+        ax.plot(doses, survival_percent, 'o-', linewidth=2, markersize=8)
+
+        # Установка логарифмической шкалы для оси X
+        ax.set_xscale('log')
+
+        # Добавляем LD50 на график, если она предоставлена
+        if ld50 is not None:
+            ax.axvline(x=ld50, color='r', linestyle='--', alpha=0.7)
+            ax.text(ld50*1.1, 50, f'LD50 = {ld50:.2f}', color='r', fontsize=12)
+
+            # Добавляем горизонтальную линию на уровне 50% выживаемости
+            ax.axhline(y=50, color='r', linestyle='--', alpha=0.3)
+
+        # Подписи и форматирование графика
+        ax.set_title('График выживаемости', fontsize=14)
+        ax.set_xlabel('Доза (логарифмическая шкала)', fontsize=12)
+        ax.set_ylabel('Выживаемость, %', fontsize=12)
+        ax.grid(True, linestyle='--', alpha=0.7)
+        ax.set_ylim(-5, 105)  # Устанавливаем диапазон оси Y от -5 до 105%
+
+        # Обновляем холст
+        self.canvas.draw()
 
 
 class LD50Calculator(QMainWindow):
@@ -70,17 +135,27 @@ class LD50Calculator(QMainWindow):
         self.updating_table = False
         self.update_table()
 
-        # Кнопка для расчета и поле для результата
+        # Кнопки для расчета, построения графика и поле для результата
         self.bottom_layout = QHBoxLayout()
 
         self.calculate_button = QPushButton("Рассчитать LD50")
         self.calculate_button.clicked.connect(self.calculate_ld50)
         self.bottom_layout.addWidget(self.calculate_button)
 
+        self.plot_button = QPushButton("Построить график")
+        self.plot_button.clicked.connect(self.show_survival_plot)
+        self.bottom_layout.addWidget(self.plot_button)
+
         self.result_label = QLabel("Результат: ")
         self.bottom_layout.addWidget(self.result_label)
 
         self.main_layout.addLayout(self.bottom_layout)
+
+        # Храним последний расчет LD50
+        self.last_ld50 = None
+
+        # Окно с графиком
+        self.survival_plot = None
 
     def validate_table_item(self, item):
         if self.updating_table:
@@ -200,10 +275,44 @@ class LD50Calculator(QMainWindow):
                 died=died,
             )
 
+            # Сохраняем расчет для использования в графике
+            self.last_ld50 = result
+
             self.result_label.setText(f"Результат: LD50 = {result:.2f}")
 
         except Exception as e:
             self.result_label.setText(f"Ошибка: {e!s}")
+            self.last_ld50 = None
+
+    def show_survival_plot(self):
+                """Отображает график выживаемости на основе текущих данных"""
+                try:
+                    max_animals = int(self.max_animals_edit.text())
+                    num_doses = int(self.num_doses_edit.text())
+
+                    # Собираем данные
+                    doses = []
+                    died = []
+                    for i in range(num_doses):
+                        dose_val = float(self.table.item(i, 0).text())
+                        doses.append(dose_val)
+                        died.append(int(self.table.item(i, 1).text()))
+
+                    # Если LD50 еще не вычислена, рассчитываем её
+                    ld50 = self.last_ld50
+                    if ld50 is None:
+                        try:
+                            ld50 = karber(doses=doses, max_animals=max_animals, died=died)
+                        except Exception:
+                            ld50 = None
+
+                    # Создаем и показываем окно с графиком
+                    self.survival_plot = SurvivalPlot(doses, died, max_animals, ld50, self)
+                    self.survival_plot.show()
+
+                except Exception as e:
+                    print(f"Ошибка при построении графика: {e!s}")
+                    self.result_label.setText(f"Ошибка построения графика: {e!s}")
 
 
 if __name__ == "__main__":
