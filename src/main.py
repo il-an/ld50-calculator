@@ -33,6 +33,8 @@ class SurvivalPlot(QWidget):
         super().__init__(parent)
         self.setWindowTitle("График выживаемости")
         self.setMinimumSize(800, 600)
+        # Делаем окно отдельным окном
+        self.setWindowFlag(Qt.WindowType.Window, True)
 
         # Создаем компоновку
         layout = QVBoxLayout(self)
@@ -261,6 +263,7 @@ class LD50Calculator(QMainWindow):
         try:
             max_animals = int(self.max_animals_edit.text())
             num_doses = int(self.num_doses_edit.text())
+            coef = float(self.dose_coef_edit.text())
 
             doses = []
             died = []
@@ -269,10 +272,14 @@ class LD50Calculator(QMainWindow):
                 doses.append(dose_val)
                 died.append(int(self.table.item(i, 1).text()))
 
+            max_dose = doses[0]  # максимальная доза — первая в списке
+
             result = karber(
-                doses=doses,
+                max_dose=max_dose,
                 max_animals=max_animals,
                 died=died,
+                dose_coefficient=coef,
+                number_of_doses=num_doses,
             )
 
             # Сохраняем расчет для использования в графике
@@ -285,34 +292,63 @@ class LD50Calculator(QMainWindow):
             self.last_ld50 = None
 
     def show_survival_plot(self):
-                """Отображает график выживаемости на основе текущих данных"""
+        """Отображает график выживаемости на основе текущих данных"""
+        try:
+            max_animals = int(self.max_animals_edit.text())
+            num_doses = int(self.num_doses_edit.text())
+
+            # Собираем данные
+            doses = []
+            died = []
+            for i in range(num_doses):
+                dose_val = float(self.table.item(i, 0).text())
+                doses.append(dose_val)
+                died.append(int(self.table.item(i, 1).text()))
+
+            # Если LD50 еще не вычислена, рассчитываем её
+            ld50 = self.last_ld50
+            if ld50 is None:
                 try:
-                    max_animals = int(self.max_animals_edit.text())
-                    num_doses = int(self.num_doses_edit.text())
+                    max_dose = doses[0]
+                    coef = float(self.dose_coef_edit.text())
+                    ld50 = karber(
+                        max_dose=max_dose,
+                        max_animals=max_animals,
+                        died=died,
+                        dose_coefficient=coef,
+                        number_of_doses=num_doses,
+                    )
+                except Exception:
+                    ld50 = None
 
-                    # Собираем данные
-                    doses = []
-                    died = []
-                    for i in range(num_doses):
-                        dose_val = float(self.table.item(i, 0).text())
-                        doses.append(dose_val)
-                        died.append(int(self.table.item(i, 1).text()))
+            # Если окно графика уже открыто, просто поднимаем его
+            if self.survival_plot is not None:
+                self.survival_plot.raise_()
+                self.survival_plot.activateWindow()
+                return
 
-                    # Если LD50 еще не вычислена, рассчитываем её
-                    ld50 = self.last_ld50
-                    if ld50 is None:
-                        try:
-                            ld50 = karber(doses=doses, max_animals=max_animals, died=died)
-                        except Exception:
-                            ld50 = None
+            # Создаем и показываем окно с графиком
+            self.survival_plot = SurvivalPlot(doses, died, max_animals, ld50, self)
+            self.survival_plot.show()
 
-                    # Создаем и показываем окно с графиком
-                    self.survival_plot = SurvivalPlot(doses, died, max_animals, ld50, self)
-                    self.survival_plot.show()
+            # При закрытии окна графика сбрасываем ссылку
+            parent = self
+            class SurvivalPlotWithClose(SurvivalPlot):
+                def closeEvent(self, event):
+                    parent.survival_plot = None
+                    event.accept()
+            self.survival_plot.closeEvent = SurvivalPlotWithClose.closeEvent.__get__(self.survival_plot, SurvivalPlot)
 
-                except Exception as e:
-                    print(f"Ошибка при построении графика: {e!s}")
-                    self.result_label.setText(f"Ошибка построения графика: {e!s}")
+        except Exception as e:
+            print(f"Ошибка при построении графика: {e!s}")
+            self.result_label.setText(f"Ошибка построения графика: {e!s}")
+
+    def closeEvent(self, event):
+        # Закрываем окно графика, если оно открыто
+        if self.survival_plot is not None:
+            self.survival_plot.close()
+            self.survival_plot = None
+        super().closeEvent(event)
 
 
 if __name__ == "__main__":
