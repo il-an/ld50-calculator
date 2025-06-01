@@ -56,3 +56,29 @@ order-by-type = false
 
 [tool.ruff.lint.flake8-tidy-imports]
 ban-relative-imports = "all"
+
+[build-system]
+requires = ["setuptools >= 77.0.3"]
+build-backend = "setuptools.build_meta"
+
+[project]
+version = "0.1.0"
+requires-python = ">=3.12"
+name = "LD50_Calculator"
+dependencies = [
+    "PySide6==6.9.0",
+    "matplotlib==3.10.3",
+]
+authors = [
+    { name = "Ilia Anisimov", email = "me@anisimovia.ru" },
+]
+readme = "README.md"
+description = "A simple LD50 calculator for educational purposes."
+license = "GPL-3.0-or-later"
+license-files = ["LICENSE"]
+
+[tool.pyside6-project]
+files = [
+    "src/main.py",
+]
+

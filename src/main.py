@@ -1,8 +1,8 @@
 import sys
 
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QDoubleValidator, QIntValidator
-from PyQt6.QtWidgets import (
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QDoubleValidator, QIntValidator
+from PySide6.QtWidgets import (
     QApplication,
     QGridLayout,
     QHBoxLayout,
@@ -17,12 +17,9 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-# Импорты для построения графиков
-import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
-from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
-from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
-import numpy as np
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 
 from biocalculator.util import karber
 

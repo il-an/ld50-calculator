@@ -377,3 +377,5 @@ compile_commands.json
 *_qmlcache.qrc
 
 # End of https://www.toptal.com/developers/gitignore/api/macos,pycharm,python,qt
+
+src/pyside_app_demo.app
