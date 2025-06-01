@@ -62,10 +62,9 @@ class SurvivalPlot(QWidget):
             label = "Выживаемость, %"
             title = "График выживаемости"
             line_label = "LD50"
-        else:
+        elif mode == "ED50":
             # ED50: считаем по выжившим
-            survived = [max_animals - d for d in died]
-            survival_percent = [s / max_animals * 100 for s in survived]
+            survival_percent = [(d / max_animals) * 100 for d in died]
             label = "Эффективность, %"
             title = "График эффективности"
             line_label = "ED50"
@@ -312,13 +311,11 @@ class LD50Calculator(QMainWindow):
                 )
                 self.last_ld50 = result
                 self.result_label.setText(f"Результат: LD50 = {result:.2f}")
-            else:
-                # ED50: считаем по выжившим
-                survived = [max_animals - d for d in died]
+            elif mode == "ED50":
                 result = karber(
                     max_dose=max_dose,
                     max_animals=max_animals,
-                    died=survived,
+                    died=died,
                     dose_coefficient=coef,
                     number_of_doses=num_doses,
                 )
@@ -359,11 +356,10 @@ class LD50Calculator(QMainWindow):
                             number_of_doses=num_doses,
                         )
                     else:
-                        survived = [max_animals - d for d in died]
                         ld50 = karber(
                             max_dose=max_dose,
                             max_animals=max_animals,
-                            died=survived,
+                            died=died,
                             dose_coefficient=coef,
                             number_of_doses=num_doses,
                         )
