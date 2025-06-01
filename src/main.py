@@ -288,7 +288,7 @@ class LD50Calculator(QMainWindow):
         try:
             max_animals = int(self.max_animals_edit.text())
             num_doses = int(self.num_doses_edit.text())
-            coef = float(self.dose_coef_edit.text())
+            coef = int(self.dose_coef_edit.text())
 
             doses = []
             died = []
@@ -346,7 +346,7 @@ class LD50Calculator(QMainWindow):
             if ld50 is None:
                 try:
                     max_dose = doses[0]
-                    coef = float(self.dose_coef_edit.text())
+                    coef = int(self.dose_coef_edit.text())
                     if mode == "LD50":
                         ld50 = karber(
                             max_dose=max_dose,
@@ -372,11 +372,9 @@ class LD50Calculator(QMainWindow):
                 self.survival_plot.activateWindow()
                 return
 
-            # Создаем и показываем окно с графиком
             self.survival_plot = SurvivalPlot(doses, died, max_animals, ld50, self, mode)
             self.survival_plot.show()
 
-            # При закрытии окна графика сбрасываем ссылку
             parent = self
             class SurvivalPlotWithClose(SurvivalPlot):
                 def closeEvent(self, event):
@@ -389,7 +387,6 @@ class LD50Calculator(QMainWindow):
             self.result_label.setText(f"Ошибка построения графика: {e!s}")
 
     def closeEvent(self, event):
-        # Закрываем окно графика, если оно открыто
         if self.survival_plot is not None:
             self.survival_plot.close()
             self.survival_plot = None
