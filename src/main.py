@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
     QTableWidgetItem,
     QVBoxLayout,
     QWidget,
+    QComboBox,  # добавлено
 )
 
 from matplotlib.figure import Figure
@@ -26,7 +27,7 @@ from biocalculator.util import karber
 
 class SurvivalPlot(QWidget):
     """Виджет для отображения графика выживаемости"""
-    def __init__(self, doses, died, max_animals, ld50=None, parent=None):
+    def __init__(self, doses, died, max_animals, ld50=None, parent=None, mode="LD50"):
         super().__init__(parent)
         self.setWindowTitle("График выживаемости")
         self.setMinimumSize(800, 600)
@@ -47,36 +48,46 @@ class SurvivalPlot(QWidget):
         layout.addWidget(self.canvas)
 
         # Строим график
-        self.plot_survival(doses, died, max_animals, ld50)
+        self.plot_survival(doses, died, max_animals, ld50, mode)
 
-    def plot_survival(self, doses, died, max_animals, ld50=None):
+    def plot_survival(self, doses, died, max_animals, ld50=None, mode="LD50"):
         # Очищаем фигуру
         self.figure.clear()
 
         # Создаем график
         ax = self.figure.add_subplot(111)
 
-        # Вычисляем процент выживших
-        survival_percent = [(1 - d / max_animals) * 100 for d in died]
+        if mode == "LD50":
+            survival_percent = [(1 - d / max_animals) * 100 for d in died]
+            label = "Выживаемость, %"
+            title = "График выживаемости"
+            line_label = "LD50"
+        else:
+            # ED50: считаем по выжившим
+            survived = [max_animals - d for d in died]
+            survival_percent = [s / max_animals * 100 for s in survived]
+            label = "Эффективность, %"
+            title = "График эффективности"
+            line_label = "ED50"
 
-        # Строим график выживаемости
+        # Строим график выживаемости/эффективности
         ax.plot(doses, survival_percent, 'o-', linewidth=2, markersize=8)
 
         # Установка логарифмической шкалы для оси X
         ax.set_xscale('log')
 
-        # Добавляем LD50 на график, если она предоставлена
+        # Добавляем LD50/ED50 на график, если она предоставлена
         if ld50 is not None:
             ax.axvline(x=ld50, color='r', linestyle='--', alpha=0.7)
-            ax.text(ld50*1.1, 50, f'LD50 = {ld50:.2f}', color='r', fontsize=12)
+            ax.text(ld50*1.1, 50, f'{line_label} = {ld50:.2f}', color='r', fontsize=12)
 
             # Добавляем горизонтальную линию на уровне 50% выживаемости
             ax.axhline(y=50, color='r', linestyle='--', alpha=0.3)
 
         # Подписи и форматирование графика
-        ax.set_title('График выживаемости', fontsize=14)
+        ax.set_title(title, fontsize=14)
         ax.set_xlabel('Доза (логарифмическая шкала)', fontsize=12)
-        ax.set_ylabel('Выживаемость, %', fontsize=12)
+        ax.set_ylabel(label, fontsize=12)
         ax.grid(True, linestyle='--', alpha=0.7)
         ax.set_ylim(-5, 105)  # Устанавливаем диапазон оси Y от -5 до 105%
 
@@ -101,25 +112,32 @@ class LD50Calculator(QMainWindow):
         # Параметры эксперимента
         self.params_layout = QGridLayout()
 
+        # --- Новый выпадающий список для выбора LD50/ED50 ---
+        self.mode_combo = QComboBox()
+        self.mode_combo.addItems(["LD50", "ED50"])
+        self.mode_combo.currentIndexChanged.connect(self.update_labels)
+        self.params_layout.addWidget(QLabel("Режим расчёта:"), 0, 0)
+        self.params_layout.addWidget(self.mode_combo, 0, 1)
+
         # Количество животных в группе
-        self.params_layout.addWidget(QLabel("Количество животных в группе:"), 0, 0)
+        self.params_layout.addWidget(QLabel("Количество животных в группе:"), 1, 0)
         self.max_animals_edit = QLineEdit("8")
         self.max_animals_edit.setValidator(QIntValidator(1, 1000))
-        self.params_layout.addWidget(self.max_animals_edit, 0, 1)
+        self.params_layout.addWidget(self.max_animals_edit, 1, 1)
 
         # Коэффициент дозы
-        self.params_layout.addWidget(QLabel("Коэффициент дозы:"), 0, 2)
+        self.params_layout.addWidget(QLabel("Коэффициент дозы:"), 1, 2)
         self.dose_coef_edit = QLineEdit("10")
         self.dose_coef_edit.setValidator(QDoubleValidator(0.1, 100, 2))
         self.dose_coef_edit.editingFinished.connect(self.update_table)
-        self.params_layout.addWidget(self.dose_coef_edit, 0, 3)
+        self.params_layout.addWidget(self.dose_coef_edit, 1, 3)
 
         # Количество доз
-        self.params_layout.addWidget(QLabel("Количество доз:"), 1, 0)
+        self.params_layout.addWidget(QLabel("Количество доз:"), 2, 0)
         self.num_doses_edit = QLineEdit("8")
         self.num_doses_edit.setValidator(QIntValidator(2, 100))
         self.num_doses_edit.editingFinished.connect(self.update_table)
-        self.params_layout.addWidget(self.num_doses_edit, 1, 1)
+        self.params_layout.addWidget(self.num_doses_edit, 2, 1)
 
         self.main_layout.addLayout(self.params_layout)
 
@@ -156,10 +174,21 @@ class LD50Calculator(QMainWindow):
         # Окно с графиком
         self.survival_plot = None
 
+    def update_labels(self):
+        mode = self.mode_combo.currentText()
+        if mode == "LD50":
+            self.table.setHorizontalHeaderLabels(["Доза", "Количество умерших"])
+            self.calculate_button.setText("Рассчитать LD50")
+        else:
+            self.table.setHorizontalHeaderLabels(["Доза", "Количество выживших"])
+            self.calculate_button.setText("Рассчитать ED50")
+        self.result_label.setText("Результат: ")
+        self.last_ld50 = None
+
     def validate_table_item(self, item):
         if self.updating_table:
             return
-        # Проверяем только ячейки столбца "Количество умерших"
+        # Проверяем только ячейки столбца "Количество умерших/выживших"
         if item.column() == 1:
             # Если ячейка пустая, заменяем на 0
             if item.text().strip() == "":
@@ -267,22 +296,34 @@ class LD50Calculator(QMainWindow):
             for i in range(num_doses):
                 dose_val = float(self.table.item(i, 0).text())
                 doses.append(dose_val)
-                died.append(int(self.table.item(i, 1).text()))
+                val = int(self.table.item(i, 1).text())
+                died.append(val)
 
             max_dose = doses[0]  # максимальная доза — первая в списке
 
-            result = karber(
-                max_dose=max_dose,
-                max_animals=max_animals,
-                died=died,
-                dose_coefficient=coef,
-                number_of_doses=num_doses,
-            )
-
-            # Сохраняем расчет для использования в графике
-            self.last_ld50 = result
-
-            self.result_label.setText(f"Результат: LD50 = {result:.2f}")
+            mode = self.mode_combo.currentText()
+            if mode == "LD50":
+                result = karber(
+                    max_dose=max_dose,
+                    max_animals=max_animals,
+                    died=died,
+                    dose_coefficient=coef,
+                    number_of_doses=num_doses,
+                )
+                self.last_ld50 = result
+                self.result_label.setText(f"Результат: LD50 = {result:.2f}")
+            else:
+                # ED50: считаем по выжившим
+                survived = [max_animals - d for d in died]
+                result = karber(
+                    max_dose=max_dose,
+                    max_animals=max_animals,
+                    died=survived,
+                    dose_coefficient=coef,
+                    number_of_doses=num_doses,
+                )
+                self.last_ld50 = result
+                self.result_label.setText(f"Результат: ED50 = {result:.2f}")
 
         except Exception as e:
             self.result_label.setText(f"Ошибка: {e!s}")
@@ -304,17 +345,28 @@ class LD50Calculator(QMainWindow):
 
             # Если LD50 еще не вычислена, рассчитываем её
             ld50 = self.last_ld50
+            mode = self.mode_combo.currentText()
             if ld50 is None:
                 try:
                     max_dose = doses[0]
                     coef = float(self.dose_coef_edit.text())
-                    ld50 = karber(
-                        max_dose=max_dose,
-                        max_animals=max_animals,
-                        died=died,
-                        dose_coefficient=coef,
-                        number_of_doses=num_doses,
-                    )
+                    if mode == "LD50":
+                        ld50 = karber(
+                            max_dose=max_dose,
+                            max_animals=max_animals,
+                            died=died,
+                            dose_coefficient=coef,
+                            number_of_doses=num_doses,
+                        )
+                    else:
+                        survived = [max_animals - d for d in died]
+                        ld50 = karber(
+                            max_dose=max_dose,
+                            max_animals=max_animals,
+                            died=survived,
+                            dose_coefficient=coef,
+                            number_of_doses=num_doses,
+                        )
                 except Exception:
                     ld50 = None
 
@@ -325,7 +377,7 @@ class LD50Calculator(QMainWindow):
                 return
 
             # Создаем и показываем окно с графиком
-            self.survival_plot = SurvivalPlot(doses, died, max_animals, ld50, self)
+            self.survival_plot = SurvivalPlot(doses, died, max_animals, ld50, self, mode)
             self.survival_plot.show()
 
             # При закрытии окна графика сбрасываем ссылку
